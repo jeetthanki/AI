@@ -1,235 +1,331 @@
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || ''
-})
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+
+if (!GEMINI_API_KEY) {
+  console.warn('GEMINI_API_KEY is not set. Resume analysis will fail until it is configured.')
+}
+
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null
+
+// Timeout helper
+function timeoutPromise(ms) {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Request timeout')), ms)
+  })
+}
+
+// Manual field extraction helper for malformed JSON
+function extractFieldsManually(text) {
+  const result = {}
+  
+  // Extract numeric scores
+  const scorePatterns = {
+    overallScore: /"overallScore"\s*:\s*(\d+)/i,
+    atsScore: /"atsScore"\s*:\s*(\d+)/i,
+    keywordScore: /"keywordScore"\s*:\s*(\d+)/i,
+    formattingScore: /"formattingScore"\s*:\s*(\d+)/i,
+    contactScore: /"contactScore"\s*:\s*(\d+)/i,
+    educationScore: /"educationScore"\s*:\s*(\d+)/i,
+    experienceScore: /"experienceScore"\s*:\s*(\d+)/i,
+    skillsScore: /"skillsScore"\s*:\s*(\d+)/i,
+    structureScore: /"structureScore"\s*:\s*(\d+)/i
+  }
+  
+  for (const [key, pattern] of Object.entries(scorePatterns)) {
+    const match = text.match(pattern)
+    if (match) {
+      result[key] = parseInt(match[1], 10)
+    }
+  }
+  
+  // Extract arrays (strengths, improvements, etc.) - use non-greedy but handle multiline
+  const arrayPatterns = {
+    strengths: /"strengths"\s*:\s*\[(.*?)(?=\]\s*[,}])/is,
+    improvements: /"improvements"\s*:\s*\[(.*?)(?=\]\s*[,}])/is,
+    skills: /"skills"\s*:\s*\[(.*?)(?=\]\s*[,}])/is,
+    recommendations: /"recommendations"\s*:\s*\[(.*?)(?=\]\s*[,}])/is,
+    atsRecommendations: /"atsRecommendations"\s*:\s*\[(.*?)(?=\]\s*[,}])/is,
+    missingKeywords: /"missingKeywords"\s*:\s*\[(.*?)(?=\]\s*[,}])/is
+  }
+  
+  for (const [key, pattern] of Object.entries(arrayPatterns)) {
+    const match = text.match(pattern)
+    if (match) {
+      // Extract strings from array - handle multiline strings
+      const arrayContent = match[1]
+      // Match quoted strings that may span multiple lines
+      const stringMatches = arrayContent.match(/"([^"\\]*(\\.[^"\\]*)*)"/g)
+      if (stringMatches) {
+        result[key] = stringMatches.map(s => {
+          // Remove quotes and unescape
+          return s.slice(1, -1)
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\')
+        }).filter(s => s.trim().length > 0)
+      } else {
+        result[key] = []
+      }
+    }
+  }
+  
+  // Extract detailedAnalysis (text between quotes, may span multiple lines)
+  // Try multiline string first
+  const analysisMatch = text.match(/"detailedAnalysis"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/is)
+  if (analysisMatch) {
+    result.detailedAnalysis = analysisMatch[1]
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+      .trim()
+  } else {
+    // Try without quotes or with single quotes
+    const analysisMatch2 = text.match(/"detailedAnalysis"\s*:\s*["']([^"']+)["']/is)
+    if (analysisMatch2) {
+      result.detailedAnalysis = analysisMatch2[1].trim()
+    } else {
+      // Try to find text after detailedAnalysis: until next field or end
+      const analysisMatch3 = text.match(/"detailedAnalysis"\s*:\s*([^,}]+?)(?=\s*[,}])/is)
+      if (analysisMatch3) {
+        result.detailedAnalysis = analysisMatch3[1].trim().replace(/^["']|["']$/g, '')
+      }
+    }
+  }
+  
+  return result
+}
 
 export async function analyzeResume(resumeText) {
-  try {
-    if (!process.env.OPENAI_API_KEY) {
-      // Fallback to mock analysis if no API key is provided
-      return generateMockAnalysis(resumeText)
-    }
+  if (!genAI) {
+    throw new Error('Gemini AI is not configured. Please set GEMINI_API_KEY in your environment.')
+  }
 
-    const prompt = `Analyze the following resume comprehensively, including ATS (Applicant Tracking System) compatibility. Return a JSON object with the following structure:
+  try {
+    // Validate that we have actual resume text, not JSON/metadata
+    const trimmedText = resumeText.trim()
+    if (trimmedText.startsWith('{') || trimmedText.startsWith('[') || trimmedText.includes('"metadata"')) {
+      console.error('[AI Analysis] ERROR: Received JSON/metadata instead of resume text!')
+      throw new Error('Invalid input: Received metadata instead of resume text. Please ensure your PDF contains selectable text content.')
+    }
+    
+    // Check minimum content quality
+    const wordCount = resumeText.split(/\s+/).filter(w => w.length > 0).length
+    if (wordCount < 20) {
+      throw new Error('Resume text is too short or invalid. Please ensure your resume contains substantial readable text.')
+    }
+    
+    // Analyze more text for better results (up to 8000 chars)
+    const textToAnalyze = resumeText.substring(0, 8000)
+    
+    console.log(`[AI Analysis] Analyzing ${textToAnalyze.length} characters (${wordCount} words) of resume text`)
+    console.log(`[AI Analysis] Text preview: ${textToAnalyze.substring(0, 150).replace(/\n/g, ' ')}...`)
+    
+    // Comprehensive but concise prompt to avoid truncation
+    const prompt = `Analyze this resume and return ONLY valid JSON (no markdown, no explanations):
+
 {
-  "overallScore": <number between 0-100>,
-  "atsScore": <number 0-100, how well optimized for ATS systems>,
-  "keywordScore": <number 0-100, keyword optimization>,
-  "formattingScore": <number 0-100, resume formatting quality>,
-  "contactScore": <number 0-100, contact information completeness>,
-  "educationScore": <number 0-100, education section quality>,
-  "experienceScore": <number 0-100, experience section quality>,
-  "skillsScore": <number 0-100, skills section quality>,
-  "structureScore": <number 0-100, overall structure and organization>,
-  "strengths": [<array of 3-5 key strengths>],
-  "improvements": [<array of 3-5 areas for improvement>],
-  "detailedAnalysis": "<detailed paragraph analysis>",
-  "skills": [<array of all skills identified>],
-  "recommendations": [<array of 3-5 actionable recommendations>],
-  "atsRecommendations": [<array of 3-5 ATS-specific optimization tips>],
-  "missingKeywords": [<array of common keywords that might be missing>]
+  "overallScore": <0-100>,
+  "atsScore": <0-100>,
+  "keywordScore": <0-100>,
+  "formattingScore": <0-100>,
+  "contactScore": <0-100>,
+  "educationScore": <0-100>,
+  "experienceScore": <0-100>,
+  "skillsScore": <0-100>,
+  "structureScore": <0-100>,
+  "strengths": ["specific strength 1", "specific strength 2", "specific strength 3", "specific strength 4", "specific strength 5"],
+  "improvements": ["specific improvement 1", "specific improvement 2", "specific improvement 3", "specific improvement 4", "specific improvement 5"],
+  "detailedAnalysis": "2-3 paragraph analysis mentioning specific details from the resume",
+  "skills": ["skill1", "skill2", "skill3", "skill4", "skill5"],
+  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3", "recommendation 4"],
+  "atsRecommendations": ["ATS tip 1", "ATS tip 2", "ATS tip 3"],
+  "missingKeywords": ["keyword1", "keyword2", "keyword3"]
 }
 
-Resume text:
-${resumeText.substring(0, 4000)}`
+Resume:
+${textToAnalyze}
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert resume analyzer. Analyze resumes and provide constructive feedback in JSON format."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1500
+Analyze the ACTUAL resume content above. Provide SPECIFIC feedback based on what you see.`
+
+    // Use Gemini 2.5 Flash model (fast and reliable)
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        temperature: 0.7, // Higher temperature for more creative, detailed analysis
+        maxOutputTokens: 4000, // Increased to prevent truncation
+        topP: 0.95,
+        topK: 40
+      }
     })
 
-    const responseText = completion.choices[0].message.content
-    // Try to extract JSON from the response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0])
+    console.log('[AI Analysis] Sending request to Gemini API...')
+    const startTime = Date.now()
+    
+    // Add 45 second timeout for more detailed analysis
+    const analysisPromise = model.generateContent(prompt)
+    const timeoutPromise_45s = timeoutPromise(45000)
+    
+    const result = await Promise.race([analysisPromise, timeoutPromise_45s])
+    const responseText = result.response.text()
+    
+    const analysisTime = Date.now() - startTime
+    console.log(`[AI Analysis] Received response in ${analysisTime}ms, length: ${responseText.length} chars`)
+    console.log(`[AI Analysis] Response preview: ${responseText.substring(0, 500)}`)
+
+    // Try to extract JSON from the response (handle markdown code blocks and extra text)
+    let jsonText = responseText.trim()
+    
+    // Remove markdown code blocks if present
+    jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+    
+    // Try to find JSON object - look for the first { and try to match to the last }
+    let jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+    
+    // If no match, try to find incomplete JSON and fix it
+    if (!jsonMatch) {
+      // Look for JSON-like structure starting with {
+      const startIndex = jsonText.indexOf('{')
+      if (startIndex !== -1) {
+        // Try to extract from { to end, then try to fix missing closing brace
+        let potentialJson = jsonText.substring(startIndex)
+        
+        // Count braces to see if it's balanced
+        const openBraces = (potentialJson.match(/\{/g) || []).length
+        const closeBraces = (potentialJson.match(/\}/g) || []).length
+        
+        // If missing closing braces, try to add them
+        if (openBraces > closeBraces) {
+          console.warn(`[AI Analysis] JSON appears incomplete (${openBraces} open, ${closeBraces} close braces). Attempting to fix...`)
+          // Try to find the last complete field and add closing braces
+          const lastCommaIndex = potentialJson.lastIndexOf(',')
+          if (lastCommaIndex !== -1) {
+            // Remove trailing comma and add closing braces
+            potentialJson = potentialJson.substring(0, lastCommaIndex) + 
+                          '}' + 
+                          '}'.repeat(openBraces - closeBraces - 1)
+            jsonMatch = [potentialJson]
+          }
+        } else {
+          // Try to extract what we have
+          jsonMatch = [potentialJson]
+        }
+      }
+    }
+    
+    if (jsonMatch && jsonMatch[0]) {
+      try {
+        let jsonString = jsonMatch[0].trim()
+        
+        // Try to fix common JSON issues
+        // Remove trailing commas before closing braces/brackets
+        jsonString = jsonString.replace(/,(\s*[}\]])/g, '$1')
+        
+        // Try parsing
+        let parsed
+        try {
+          parsed = JSON.parse(jsonString)
+        } catch (parseError) {
+          // If parsing fails, try to extract individual fields manually
+          console.warn('[AI Analysis] JSON parse failed, attempting manual extraction...')
+          parsed = extractFieldsManually(jsonString)
+        }
+        
+        console.log('[AI Analysis] Successfully parsed JSON response')
+        console.log(`[AI Analysis] Scores - Overall: ${parsed.overallScore || 'N/A'}, ATS: ${parsed.atsScore || 'N/A'}, Skills found: ${parsed.skills?.length || 0}`)
+        
+        // Validate and ensure all required fields exist with proper defaults
+        const analysis = {
+          overallScore: typeof parsed.overallScore === 'number' ? Math.max(0, Math.min(100, parsed.overallScore)) : 0,
+          atsScore: typeof parsed.atsScore === 'number' ? Math.max(0, Math.min(100, parsed.atsScore)) : 0,
+          keywordScore: typeof parsed.keywordScore === 'number' ? Math.max(0, Math.min(100, parsed.keywordScore)) : 0,
+          formattingScore: typeof parsed.formattingScore === 'number' ? Math.max(0, Math.min(100, parsed.formattingScore)) : 0,
+          contactScore: typeof parsed.contactScore === 'number' ? Math.max(0, Math.min(100, parsed.contactScore)) : 0,
+          educationScore: typeof parsed.educationScore === 'number' ? Math.max(0, Math.min(100, parsed.educationScore)) : 0,
+          experienceScore: typeof parsed.experienceScore === 'number' ? Math.max(0, Math.min(100, parsed.experienceScore)) : 0,
+          skillsScore: typeof parsed.skillsScore === 'number' ? Math.max(0, Math.min(100, parsed.skillsScore)) : 0,
+          structureScore: typeof parsed.structureScore === 'number' ? Math.max(0, Math.min(100, parsed.structureScore)) : 0,
+          strengths: Array.isArray(parsed.strengths) && parsed.strengths.length > 0 
+            ? parsed.strengths.filter(s => s && s.trim().length > 0)
+            : [],
+          improvements: Array.isArray(parsed.improvements) && parsed.improvements.length > 0
+            ? parsed.improvements.filter(i => i && i.trim().length > 0)
+            : [],
+          detailedAnalysis: parsed.detailedAnalysis && parsed.detailedAnalysis.trim().length > 0
+            ? parsed.detailedAnalysis.trim()
+            : 'Analysis completed. Please review the scores and recommendations below.',
+          skills: Array.isArray(parsed.skills) && parsed.skills.length > 0
+            ? parsed.skills.filter(s => s && s.trim().length > 0)
+            : [],
+          recommendations: Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0
+            ? parsed.recommendations.filter(r => r && r.trim().length > 0)
+            : [],
+          atsRecommendations: Array.isArray(parsed.atsRecommendations) && parsed.atsRecommendations.length > 0
+            ? parsed.atsRecommendations.filter(a => a && a.trim().length > 0)
+            : [],
+          missingKeywords: Array.isArray(parsed.missingKeywords) && parsed.missingKeywords.length > 0
+            ? parsed.missingKeywords.filter(k => k && k.trim().length > 0)
+            : []
+        }
+        
+        // Log if we got meaningful analysis
+        if (analysis.detailedAnalysis.length > 50 && analysis.strengths.length > 0) {
+          console.log('[AI Analysis] ✅ Received detailed, personalized analysis')
+        } else {
+          console.warn('[AI Analysis] ⚠️ Analysis may be too generic, check prompt')
+        }
+        
+        return analysis
+      } catch (parseError) {
+        console.error('[AI Analysis] JSON parse error:', parseError.message)
+        console.error('[AI Analysis] Full response:', responseText)
+        
+        // Try manual field extraction as last resort
+        try {
+          console.log('[AI Analysis] Attempting manual field extraction...')
+          const manualParsed = extractFieldsManually(responseText)
+          if (manualParsed && manualParsed.overallScore !== undefined) {
+            console.log('[AI Analysis] Manual extraction successful!')
+            parsed = manualParsed
+          } else {
+            throw new Error('Manual extraction also failed')
+          }
+        } catch (manualError) {
+          throw new Error(`Failed to parse AI response: ${parseError.message}. Response preview: ${responseText.substring(0, 300)}`)
+        }
+      }
     } else {
-      throw new Error('Invalid response format from AI')
+      console.error('[AI Analysis] No JSON found in response')
+      console.error('[AI Analysis] Full response:', responseText)
+      
+      // Last attempt: try to extract fields manually from the raw response
+      try {
+        console.log('[AI Analysis] Attempting manual field extraction from raw response...')
+        const manualParsed = extractFieldsManually(responseText)
+        if (manualParsed && manualParsed.overallScore !== undefined) {
+          console.log('[AI Analysis] Manual extraction from raw response successful!')
+          parsed = manualParsed
+        } else {
+          throw new Error('No valid data found')
+        }
+      } catch (manualError) {
+        throw new Error(`Invalid response format from Gemini (no JSON found). Response: ${responseText.substring(0, 500)}`)
+      }
+    }
+    
+    // Ensure parsed exists before proceeding
+    if (!parsed) {
+      throw new Error('Failed to extract any data from AI response')
     }
   } catch (error) {
-    console.error('Error analyzing resume with AI:', error)
-    // Fallback to mock analysis
-    return generateMockAnalysis(resumeText)
-  }
-}
-
-function generateMockAnalysis(resumeText) {
-  // Enhanced keyword-based analysis as fallback
-  const text = resumeText.toLowerCase()
-  
-  const skills = []
-  const commonSkills = ['javascript', 'python', 'react', 'node', 'mongodb', 'sql', 'html', 'css', 'java', 'c++', 'git', 'docker', 'aws', 'linux', 'typescript', 'angular', 'vue', 'express', 'rest', 'api']
-  commonSkills.forEach(skill => {
-    if (text.includes(skill)) {
-      skills.push(skill.charAt(0).toUpperCase() + skill.slice(1))
+    console.error('Error analyzing resume with Gemini:', error.message)
+    if (error.message === 'Request timeout') {
+      throw new Error('Analysis timed out. Please try again with a shorter resume.')
     }
-  })
-
-  // Check for various sections
-  const hasEducation = text.includes('education') || text.includes('degree') || text.includes('university') || text.includes('college') || text.includes('bachelor') || text.includes('master')
-  const hasExperience = text.includes('experience') || text.includes('work') || text.includes('employment') || text.includes('position') || text.includes('role')
-  const hasProjects = text.includes('project') || text.includes('portfolio')
-  const hasContact = (text.includes('@') || text.includes('email')) && (text.includes('phone') || text.includes('mobile') || /\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/.test(resumeText))
-  const hasSummary = text.includes('summary') || text.includes('objective') || text.includes('profile')
-  
-  // Calculate individual scores
-  let contactScore = 0
-  if (text.includes('@') || text.includes('email')) contactScore += 30
-  if (text.includes('phone') || text.includes('mobile') || /\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/.test(resumeText)) contactScore += 30
-  if (text.includes('linkedin') || text.includes('github') || text.includes('portfolio')) contactScore += 20
-  if (text.includes('address') || text.includes('location')) contactScore += 20
-  
-  let educationScore = hasEducation ? 70 : 20
-  if (text.includes('gpa') || text.includes('grade')) educationScore += 15
-  if (text.includes('honor') || text.includes('dean')) educationScore += 15
-  
-  let experienceScore = hasExperience ? 60 : 20
-  const experienceCount = (text.match(/experience|work|employment|position|role/gi) || []).length
-  if (experienceCount > 2) experienceScore += 20
-  if (text.includes('achievement') || text.includes('accomplish')) experienceScore += 10
-  if (/\d+/.test(text)) experienceScore += 10 // Has numbers/metrics
-  
-  let skillsScore = skills.length > 0 ? Math.min(60 + (skills.length * 2), 100) : 20
-  if (skills.length > 5) skillsScore += 20
-  if (text.includes('certification') || text.includes('certificate')) skillsScore += 10
-  
-  let formattingScore = 60
-  if (text.length > 500 && text.length < 2000) formattingScore += 20
-  if (!text.includes('table') && !text.includes('column')) formattingScore += 10
-  if (text.split('\n').length > 10) formattingScore += 10
-  
-  let structureScore = 50
-  if (hasContact) structureScore += 10
-  if (hasSummary) structureScore += 10
-  if (hasEducation) structureScore += 10
-  if (hasExperience) structureScore += 15
-  if (hasProjects) structureScore += 10
-  if (skills.length > 0) structureScore += 5
-  
-  // ATS Score calculation
-  let atsScore = 50
-  if (hasContact) atsScore += 10
-  if (skills.length > 3) atsScore += 10
-  if (hasEducation) atsScore += 10
-  if (hasExperience) atsScore += 10
-  if (text.length > 500 && text.length < 2000) atsScore += 10
-  if (!text.includes('table') && !text.includes('image') && !text.includes('graphic')) atsScore += 10
-  
-  // Keyword Score
-  const keywordDensity = skills.length / Math.max(text.split(/\s+/).length / 100, 1)
-  let keywordScore = Math.min(keywordDensity * 20, 100)
-  
-  // Overall score
-  let overallScore = Math.round((atsScore + educationScore + experienceScore + skillsScore + formattingScore + structureScore) / 6)
-  
-  const strengths = []
-  const improvements = []
-  const atsRecommendations = []
-  const missingKeywords = []
-  
-  if (hasEducation) {
-    strengths.push('Education section is present')
-  } else {
-    improvements.push('Add an education section')
-    atsRecommendations.push('Include education section for better ATS parsing')
-  }
-  
-  if (hasExperience) {
-    strengths.push('Work experience is documented')
-  } else {
-    improvements.push('Include work experience or internships')
-  }
-  
-  if (skills.length > 0) {
-    strengths.push(`Strong technical skills identified (${skills.length} skills)`)
-  } else {
-    improvements.push('List relevant technical skills')
-    atsRecommendations.push('Add a dedicated skills section with relevant keywords')
-  }
-  
-  if (hasProjects) {
-    strengths.push('Projects section included')
-  } else {
-    improvements.push('Add a projects section to showcase your work')
-  }
-  
-  if (hasContact) {
-    strengths.push('Contact information is present')
-  } else {
-    improvements.push('Ensure contact information is complete')
-    atsRecommendations.push('Include email and phone number in a standard format')
-  }
-  
-  if (text.length > 500) {
-    strengths.push('Resume has sufficient detail')
-  } else {
-    improvements.push('Add more detail to your resume')
-  }
-  
-  // ATS-specific recommendations
-  if (!hasSummary) {
-    atsRecommendations.push('Add a professional summary or objective section')
-  }
-  
-  if (text.includes('table') || text.includes('column')) {
-    atsRecommendations.push('Avoid using tables or complex formatting - ATS systems may not parse them correctly')
-  }
-  
-  if (skills.length < 5) {
-    atsRecommendations.push('Include more relevant keywords and skills from the job description')
-  }
-  
-  // Missing keywords suggestions
-  const suggestedKeywords = ['leadership', 'communication', 'problem solving', 'teamwork', 'project management']
-  suggestedKeywords.forEach(keyword => {
-    if (!text.includes(keyword.toLowerCase())) {
-      missingKeywords.push(keyword)
-    }
-  })
-
-  return {
-    overallScore: Math.min(overallScore, 100),
-    atsScore: Math.min(atsScore, 100),
-    keywordScore: Math.min(keywordScore, 100),
-    formattingScore: Math.min(formattingScore, 100),
-    contactScore: Math.min(contactScore, 100),
-    educationScore: Math.min(educationScore, 100),
-    experienceScore: Math.min(experienceScore, 100),
-    skillsScore: Math.min(skillsScore, 100),
-    structureScore: Math.min(structureScore, 100),
-    strengths: strengths.length > 0 ? strengths : ['Resume structure is present'],
-    improvements: improvements.length > 0 ? improvements : ['Continue building your experience'],
-    detailedAnalysis: `This resume contains ${text.split(/\s+/).length} words. ${hasEducation ? 'Education background is included. ' : ''}${hasExperience ? 'Work experience is documented. ' : ''}${skills.length > 0 ? `Technical skills identified: ${skills.slice(0, 5).join(', ')}. ` : ''}The ATS compatibility score is ${atsScore}/100. Consider tailoring your resume to highlight your most relevant achievements and skills for better ATS parsing.`,
-    skills: skills.length > 0 ? skills : ['Skills section needed'],
-    recommendations: [
-      'Use action verbs to describe your achievements',
-      'Quantify your accomplishments with numbers and metrics',
-      'Tailor your resume to the job description',
-      'Keep formatting clean and consistent',
-      'Proofread for grammar and spelling errors'
-    ],
-    atsRecommendations: atsRecommendations.length > 0 ? atsRecommendations : [
-      'Use standard section headings (Experience, Education, Skills)',
-      'Avoid graphics, images, and complex formatting',
-      'Save as PDF to preserve formatting',
-      'Include relevant keywords from job descriptions'
-    ],
-    missingKeywords: missingKeywords.length > 0 ? missingKeywords : []
+    throw new Error(`Failed to analyze resume: ${error.message}`)
   }
 }
 

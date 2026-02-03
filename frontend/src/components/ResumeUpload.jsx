@@ -5,6 +5,7 @@ import './ResumeUpload.css'
 function ResumeUpload({ onUploadStart, onAnalysisComplete, onError, loading }) {
   const [file, setFile] = useState(null)
   const [dragActive, setDragActive] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef(null)
 
   const handleFileChange = (e) => {
@@ -57,14 +58,31 @@ function ResumeUpload({ onUploadStart, onAnalysisComplete, onError, loading }) {
     formData.append('resume', file)
 
     try {
+      setUploadProgress(0)
       const response = await axios.post('/api/resume/analyze', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
+        },
+        timeout: 60000, // 60 second timeout
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            setUploadProgress(percentCompleted)
+          }
         }
       })
-      onAnalysisComplete(response.data)
+      setUploadProgress(100)
+      setTimeout(() => {
+        onAnalysisComplete(response.data)
+        setUploadProgress(0)
+      }, 500)
     } catch (error) {
-      onError(error.response?.data?.error || 'Failed to analyze resume. Please try again.')
+      setUploadProgress(0)
+      if (error.code === 'ECONNABORTED') {
+        onError('Request timed out. Please try again with a smaller file or check your connection.')
+      } else {
+        onError(error.response?.data?.error || 'Failed to analyze resume. Please try again.')
+      }
     }
   }
 
@@ -104,13 +122,60 @@ function ResumeUpload({ onUploadStart, onAnalysisComplete, onError, loading }) {
           </div>
         </div>
 
+        {file && (
+          <div className="file-preview-card">
+            <div className="file-info">
+              <span className="file-icon-small">📄</span>
+              <div className="file-details">
+                <p className="file-name-preview">{file.name}</p>
+                <p className="file-size-preview">{(file.size / 1024).toFixed(2)} KB</p>
+              </div>
+              <button
+                type="button"
+                className="remove-file-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setFile(null)
+                  setUploadProgress(0)
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         <button
           type="submit"
-          className="analyze-button"
+          className={`analyze-button ${loading ? 'analyzing' : ''}`}
           disabled={!file || loading}
         >
-          {loading ? 'Analyzing...' : 'Analyze Resume'}
+          {loading ? (
+            <>
+              <span className="spinner-small"></span>
+              <span>Analyzing Resume...</span>
+            </>
+          ) : (
+            <>
+              <span>✨</span>
+              <span>Analyze Resume</span>
+            </>
+          )}
         </button>
+
+        {loading && (
+          <div className="progress-container">
+            <div className="progress-bar">
+              <div 
+                className="progress-fill" 
+                style={{ width: `${uploadProgress || 10}%` }}
+              ></div>
+            </div>
+            <p className="progress-text">
+              {uploadProgress < 50 ? 'Uploading...' : uploadProgress < 90 ? 'Processing...' : 'Finalizing analysis...'}
+            </p>
+          </div>
+        )}
       </form>
     </div>
   )

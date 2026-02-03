@@ -88,8 +88,8 @@ function App() {
         <header className="header">
           <div className="header-content">
             <div>
-              <h1>AI Resume Analyzer</h1>
-              <p>Upload your resume and get instant AI-powered analysis</p>
+              <h1>✨ AI Resume Analyzer</h1>
+              <p>Get instant, personalized feedback on your resume</p>
             </div>
             <div className="user-section">
               <span className="user-name">Welcome, {user.name}!</span>
@@ -100,6 +100,17 @@ function App() {
           </div>
         </header>
 
+        {!analysisResult && !uploadLoading && (
+          <div className="welcome-tips">
+            <h3>💡 Quick Tips</h3>
+            <ul>
+              <li>Upload a text-based PDF or Word document for best results</li>
+              <li>Ensure your resume contains selectable text (not scanned images)</li>
+              <li>Get detailed scores and personalized recommendations</li>
+            </ul>
+          </div>
+        )}
+
         <ResumeUpload
           onUploadStart={handleUploadStart}
           onAnalysisComplete={handleAnalysisComplete}
@@ -109,7 +120,7 @@ function App() {
 
         {error && (
           <div className="error-message">
-            <p>{error}</p>
+            <p>⚠️ {error}</p>
           </div>
         )}
 

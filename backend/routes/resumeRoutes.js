@@ -4,6 +4,10 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import fs from 'fs/promises'
 import Resume from '../models/Resume.js'
+import AnalysisLog from '../models/AnalysisLog.js'
+import SkillSnapshot from '../models/SkillSnapshot.js'
+import RecommendationSet from '../models/RecommendationSet.js'
+import UserActivity from '../models/UserActivity.js'
 import { extractTextFromResume } from '../services/resumeParser.js'
 import { analyzeResume } from '../services/aiAnalyzer.js'
 import { authenticate } from '../middleware/auth.js'
@@ -50,19 +54,65 @@ const upload = multer({
 
 // Analyze resume endpoint
 router.post('/analyze', authenticate, upload.single('resume'), async (req, res) => {
+  const startTime = Date.now()
+  let resume = null
+  
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' })
     }
 
-    // Extract text from resume
-    const resumeText = await extractTextFromResume(req.file.path, req.file.mimetype)
+    console.log(`[${new Date().toISOString()}] Starting analysis for user ${req.user._id}`)
 
-    // Analyze with AI
+    // Extract text from resume (with timeout)
+    console.log(`[${new Date().toISOString()}] Extracting text from file: ${req.file.originalname} (${req.file.size} bytes)`)
+    
+    const extractPromise = extractTextFromResume(req.file.path, req.file.mimetype)
+    const extractTimeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Text extraction timeout after 15 seconds')), 15000)
+    )
+    
+    let resumeText
+    try {
+      resumeText = await Promise.race([extractPromise, extractTimeout])
+    } catch (extractError) {
+      console.error(`[${new Date().toISOString()}] Text extraction failed:`, extractError.message)
+      throw extractError
+    }
+    
+    // Validate extracted text quality
+    if (!resumeText || resumeText.trim().length < 50) {
+      console.error(`[${new Date().toISOString()}] Insufficient text extracted: ${resumeText?.length || 0} characters`)
+      throw new Error('Could not extract sufficient text from resume. The file might be scanned (image-based) or corrupted. Please use a text-based PDF or Word document.')
+    }
+    
+    // Additional validation: ensure it's not JSON/metadata
+    const trimmedText = resumeText.trim()
+    if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
+      console.error(`[${new Date().toISOString()}] ERROR: Extracted text appears to be JSON/metadata!`)
+      console.error(`[${new Date().toISOString()}] Text preview: ${trimmedText.substring(0, 200)}`)
+      throw new Error('Text extraction failed - received metadata instead of resume content. Please try uploading a different file format or ensure your PDF contains selectable text.')
+    }
+    
+    // Check word count
+    const wordCount = resumeText.split(/\s+/).filter(w => w.length > 0).length
+    console.log(`[${new Date().toISOString()}] Successfully extracted ${resumeText.length} characters, ${wordCount} words`)
+    
+    if (wordCount < 20) {
+      throw new Error('Resume contains insufficient text content. Please ensure your resume has substantial readable text.')
+    }
+    
+    // Log text preview for verification
+    console.log(`[${new Date().toISOString()}] Text preview: ${resumeText.substring(0, 150).replace(/\n/g, ' ')}...`)
+    console.log(`[${new Date().toISOString()}] Starting AI analysis with ${resumeText.length} characters`)
+
+    // Analyze with AI (Gemini) - this is the main bottleneck
     const analysis = await analyzeResume(resumeText)
+    
+    console.log(`[${new Date().toISOString()}] AI analysis completed in ${Date.now() - startTime}ms`)
 
-    // Save to database
-    const resume = new Resume({
+    // Save to database (main resume document)
+    resume = new Resume({
       user: req.user._id,
       filename: req.file.filename,
       originalName: req.file.originalname,
@@ -74,16 +124,73 @@ router.post('/analyze', authenticate, upload.single('resume'), async (req, res) 
 
     await resume.save()
 
-    // Clean up file after processing (optional - you might want to keep it)
-    // await fs.unlink(req.file.path)
+    // Additional data tables (collections) - save in parallel for speed
+    const [analysisLog, skillSnapshot, recommendationSet, userActivity] = await Promise.all([
+      AnalysisLog.create({
+        user: req.user._id,
+        resume: resume._id,
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        success: true
+      }),
+      SkillSnapshot.create({
+        user: req.user._id,
+        resume: resume._id,
+        skills: analysis.skills || [],
+        primarySkills: (analysis.skills || []).slice(0, 5),
+        totalSkills: (analysis.skills || []).length
+      }),
+      RecommendationSet.create({
+        user: req.user._id,
+        resume: resume._id,
+        strengths: analysis.strengths || [],
+        improvements: analysis.improvements || [],
+        recommendations: analysis.recommendations || [],
+        atsRecommendations: analysis.atsRecommendations || [],
+        missingKeywords: analysis.missingKeywords || []
+      }),
+      UserActivity.create({
+        user: req.user._id,
+        resume: resume._id,
+        overallScore: analysis.overallScore,
+        atsScore: analysis.atsScore,
+        keywordScore: analysis.keywordScore
+      })
+    ])
+
+    const totalTime = Date.now() - startTime
+    console.log(`[${new Date().toISOString()}] Analysis complete in ${totalTime}ms`)
 
     res.json({
       success: true,
       ...resume.analysis,
-      resumeId: resume._id
+      resumeId: resume._id,
+      meta: {
+        analysisLogId: analysisLog._id,
+        skillSnapshotId: skillSnapshot._id,
+        recommendationSetId: recommendationSet._id,
+        userActivityId: userActivity._id,
+        processingTime: totalTime
+      }
     })
   } catch (error) {
-    console.error('Error processing resume:', error)
+    console.error(`[${new Date().toISOString()}] Error processing resume:`, error.message)
+    
+    // Log error to AnalysisLog if resume was created
+    if (resume && resume._id) {
+      try {
+        await AnalysisLog.create({
+          user: req.user._id,
+          resume: resume._id,
+          provider: 'gemini',
+          model: 'gemini-2.5-flash',
+          success: false,
+          errorMessage: error.message
+        })
+      } catch (logError) {
+        console.error('Failed to log error:', logError)
+      }
+    }
     
     // Clean up file on error
     if (req.file && req.file.path) {
@@ -94,8 +201,10 @@ router.post('/analyze', authenticate, upload.single('resume'), async (req, res) 
       }
     }
 
+    const errorMessage = error.message || 'Failed to analyze resume'
     res.status(500).json({ 
-      error: error.message || 'Failed to analyze resume' 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
 })

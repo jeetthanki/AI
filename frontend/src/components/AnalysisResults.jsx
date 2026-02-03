@@ -226,9 +226,15 @@ function AnalysisResults({ result }) {
           <div className="card-content">
             <div className="detailed-analysis">
               {result.detailedAnalysis ? (
-                <p>{result.detailedAnalysis}</p>
+                <div className="analysis-text">
+                  {result.detailedAnalysis.split('\n').map((paragraph, index) => 
+                    paragraph.trim() ? (
+                      <p key={index}>{paragraph.trim()}</p>
+                    ) : null
+                  )}
+                </div>
               ) : (
-                <p>No detailed analysis available</p>
+                <p className="no-analysis">No detailed analysis available</p>
               )}
             </div>
           </div>
