@@ -2,14 +2,6 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './AdminDashboard.css'
 
-function getScoreClass(score) {
-  if (!score && score !== 0) return 'na'
-  if (score >= 80) return 'excellent'
-  if (score >= 60) return 'good'
-  if (score >= 40) return 'fair'
-  return 'poor'
-}
-
 function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
@@ -17,31 +9,26 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedUser, setSelectedUser] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     fetchDashboardData()
   }, [])
 
-  const fetchDashboardData = async (showRefreshing = false) => {
+  const fetchDashboardData = async () => {
     try {
-      if (showRefreshing) setRefreshing(true)
       const [statsRes, usersRes, resumesRes] = await Promise.all([
         axios.get('/api/admin/dashboard/stats'),
-        axios.get('/api/admin/users?limit=100'),
-        axios.get('/api/admin/resumes?limit=50')
+        axios.get('/api/admin/users?limit=50'),
+        axios.get('/api/admin/resumes?limit=20')
       ])
       
       setStats(statsRes.data.stats)
       setUsers(usersRes.data.users)
       setResumes(resumesRes.data.resumes)
       setLoading(false)
-      setRefreshing(false)
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
       setLoading(false)
-      setRefreshing(false)
     }
   }
 
@@ -65,62 +52,28 @@ function AdminDashboard() {
     )
   }
 
-  // Filter users and resumes based on search
-  const filteredUsers = users.filter(user => 
-    user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const filteredResumes = resumes.filter(resume =>
-    resume.originalName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    resume.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    resume.user?.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
   return (
     <div className="admin-dashboard">
       <div className="dashboard-header">
-        <div className="header-top">
-          <div>
-            <h1>📊 Admin Dashboard</h1>
-            <p className="header-subtitle">Manage users, view analytics, and monitor activity</p>
-          </div>
-          <button 
-            className="refresh-button"
-            onClick={() => fetchDashboardData(true)}
-            disabled={refreshing}
-            title="Refresh data"
-          >
-            {refreshing ? '🔄' : '↻'} {refreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
-        </div>
+        <h1>Admin Dashboard</h1>
         <div className="dashboard-tabs">
           <button 
             className={activeTab === 'overview' ? 'active' : ''}
-            onClick={() => {
-              setActiveTab('overview')
-              setSearchQuery('')
-            }}
+            onClick={() => setActiveTab('overview')}
           >
-            📈 Overview
+            Overview
           </button>
           <button 
             className={activeTab === 'users' ? 'active' : ''}
-            onClick={() => {
-              setActiveTab('users')
-              setSearchQuery('')
-            }}
+            onClick={() => setActiveTab('users')}
           >
-            👥 Users ({users.length})
+            Users
           </button>
           <button 
             className={activeTab === 'resumes' ? 'active' : ''}
-            onClick={() => {
-              setActiveTab('resumes')
-              setSearchQuery('')
-            }}
+            onClick={() => setActiveTab('resumes')}
           >
-            📄 Resumes ({resumes.length})
+            Resumes
           </button>
         </div>
       </div>
@@ -237,37 +190,8 @@ function AdminDashboard() {
 
       {activeTab === 'users' && (
         <div className="dashboard-content">
-          <div className="section-header">
-            <h2>👥 User Management</h2>
-            <div className="search-box">
-              <span className="search-icon">🔍</span>
-              <input
-                type="text"
-                placeholder="Search users by name or email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="search-input"
-              />
-              {searchQuery && (
-                <button 
-                  className="clear-search"
-                  onClick={() => setSearchQuery('')}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
-          {filteredUsers.length === 0 ? (
-            <div className="empty-state">
-              <p>{searchQuery ? 'No users found matching your search' : 'No users found'}</p>
-            </div>
-          ) : (
-            <div className="table-container">
-              <div className="table-info">
-                Showing {filteredUsers.length} of {users.length} users
-              </div>
-              <table className="data-table">
+          <div className="table-container">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -278,14 +202,12 @@ function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => (
+                {users.map((user) => (
                   <tr key={user._id}>
                     <td>{user.name}</td>
                     <td>{user.email}</td>
-                    <td>
-                      <span className="count-badge">{user.resumeCount || 0}</span>
-                    </td>
-                    <td className="date-cell">{new Date(user.createdAt).toLocaleDateString()}</td>
+                    <td>{user.resumeCount || 0}</td>
+                    <td>{new Date(user.createdAt).toLocaleDateString()}</td>
                     <td>
                       <button 
                         className="view-button"
@@ -308,37 +230,8 @@ function AdminDashboard() {
 
       {activeTab === 'resumes' && (
         <div className="dashboard-content">
-          <div className="section-header">
-            <h2>📄 Resume Analysis</h2>
-            <div className="search-box">
-              <span className="search-icon">🔍</span>
-              <input
-                type="text"
-                placeholder="Search resumes by filename or user..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="search-input"
-              />
-              {searchQuery && (
-                <button 
-                  className="clear-search"
-                  onClick={() => setSearchQuery('')}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
-          {filteredResumes.length === 0 ? (
-            <div className="empty-state">
-              <p>{searchQuery ? 'No resumes found matching your search' : 'No resumes found'}</p>
-            </div>
-          ) : (
-            <div className="table-container">
-              <div className="table-info">
-                Showing {filteredResumes.length} of {resumes.length} resumes
-              </div>
-              <table className="data-table">
+          <div className="table-container">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>User</th>
@@ -349,25 +242,17 @@ function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filteredResumes.map((resume) => (
+                {resumes.map((resume) => (
                   <tr key={resume._id}>
                     <td>
                       {resume.user?.name || 'Unknown'}
                       <br />
                       <small>{resume.user?.email}</small>
                     </td>
-                    <td className="filename-cell">{resume.originalName}</td>
-                    <td>
-                      <span className={`score-badge score-${getScoreClass(resume.analysis?.overallScore)}`}>
-                        {resume.analysis?.overallScore || 'N/A'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`score-badge score-${getScoreClass(resume.analysis?.atsScore)}`}>
-                        {resume.analysis?.atsScore || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="date-cell">{new Date(resume.uploadedAt).toLocaleDateString()}</td>
+                    <td>{resume.originalName}</td>
+                    <td>{resume.analysis?.overallScore || 'N/A'}</td>
+                    <td>{resume.analysis?.atsScore || 'N/A'}</td>
+                    <td>{new Date(resume.uploadedAt).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -388,50 +273,26 @@ function AdminDashboard() {
             ← Back to Users
           </button>
           <div className="user-activity-header">
-            <div className="user-info-card">
-              <div className="user-avatar">{selectedUser.user?.name?.charAt(0).toUpperCase() || 'U'}</div>
-              <div>
-                <h2>{selectedUser.user?.name || 'Unknown User'}</h2>
-                <p className="user-email">{selectedUser.user?.email}</p>
-                <div className="user-stats">
-                  <span className="stat-badge">
-                    📄 {selectedUser.totalResumes || 0} Resumes
-                  </span>
-                </div>
-              </div>
-            </div>
+            <h2>User Activity: {selectedUser.user?.name}</h2>
+            <p>{selectedUser.user?.email}</p>
+            <p>Total Resumes: {selectedUser.totalResumes}</p>
           </div>
           <div className="activity-resumes">
             {selectedUser.resumes && selectedUser.resumes.length > 0 ? (
               selectedUser.resumes.map((resume) => (
                 <div key={resume._id} className="activity-resume-card">
-                  <div className="resume-card-header">
-                    <h4>{resume.originalName}</h4>
-                    <span className="resume-badge">📄</span>
-                  </div>
+                  <h4>{resume.originalName}</h4>
                   <div className="resume-scores">
-                    <div className="score-item">
-                      <span className="score-label">Overall</span>
-                      <span className={`score-value score-${getScoreClass(resume.analysis?.overallScore)}`}>
-                        {resume.analysis?.overallScore || 'N/A'}
-                      </span>
-                    </div>
-                    <div className="score-item">
-                      <span className="score-label">ATS</span>
-                      <span className={`score-value score-${getScoreClass(resume.analysis?.atsScore)}`}>
-                        {resume.analysis?.atsScore || 'N/A'}
-                      </span>
-                    </div>
+                    <span>Overall: {resume.analysis?.overallScore || 'N/A'}</span>
+                    <span>ATS: {resume.analysis?.atsScore || 'N/A'}</span>
                   </div>
                   <p className="resume-date">
-                    📅 {new Date(resume.uploadedAt).toLocaleString()}
+                    Uploaded: {new Date(resume.uploadedAt).toLocaleString()}
                   </p>
                 </div>
               ))
             ) : (
-              <div className="empty-state">
-                <p>No resumes uploaded yet</p>
-              </div>
+              <p>No resumes uploaded yet</p>
             )}
           </div>
         </div>
