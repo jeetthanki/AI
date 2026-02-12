@@ -142,8 +142,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .error-message {
@@ -160,9 +164,16 @@
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-10px); }
-  75% { transform: translateX(10px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
 }
 
 .error-message p {
@@ -200,11 +211,10 @@
 }
 
 .welcome-tips li::before {
-  content: '✓';
+  content: "✓";
   position: absolute;
   left: 0;
   color: #4caf50;
   font-weight: bold;
   font-size: 1.2rem;
 }
-

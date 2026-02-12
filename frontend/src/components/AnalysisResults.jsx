@@ -12,6 +12,9 @@ function getScoreColor(score) {
 
 function AnalysisResults({ result }) {
   const [downloading, setDownloading] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [rating, setRating] = useState(0)
+  const [feedbackStatus, setFeedbackStatus] = useState(null)
 
   const handleDownload = async () => {
     if (!result.resumeId) {
@@ -38,6 +41,35 @@ function AnalysisResults({ result }) {
       alert('Failed to download report. Please try again.')
     } finally {
       setDownloading(false)
+    }
+  }
+
+  const handleSubmitFeedback = async (e) => {
+    e.preventDefault()
+
+    if (!result.meta?.analysisResultId) {
+      setFeedbackStatus('Analysis ID not available. Please re-run the analysis.')
+      return
+    }
+
+    if (!feedbackText.trim() && !rating) {
+      setFeedbackStatus('Please provide a rating or feedback text.')
+      return
+    }
+
+    try {
+      setFeedbackStatus('Submitting feedback...')
+      await axios.post('/api/feedback', {
+        analysisId: result.meta.analysisResultId,
+        feedback_text: feedbackText.trim(),
+        rating: rating || undefined
+      })
+      setFeedbackStatus('Thank you! Your feedback has been submitted.')
+      setFeedbackText('')
+      setRating(0)
+    } catch (error) {
+      console.error('Error submitting feedback:', error)
+      setFeedbackStatus(error.response?.data?.error || 'Failed to submit feedback. Please try again.')
     }
   }
 
@@ -306,6 +338,50 @@ function AnalysisResults({ result }) {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="result-card full-width feedback-card">
+        <div className="card-header">
+          <span className="card-icon">💬</span>
+          <h3>Your Feedback</h3>
+        </div>
+        <div className="card-content">
+          <p className="feedback-intro">
+            Help us improve the analyzer. How helpful was this analysis and what should be improved?
+          </p>
+          <form className="feedback-form" onSubmit={handleSubmitFeedback}>
+            <div className="feedback-rating">
+              <label>Rating (1–5):</label>
+              <select
+                value={rating}
+                onChange={(e) => setRating(Number(e.target.value))}
+              >
+                <option value={0}>Select rating</option>
+                <option value={5}>5 - Excellent</option>
+                <option value={4}>4 - Good</option>
+                <option value={3}>3 - Okay</option>
+                <option value={2}>2 - Poor</option>
+                <option value={1}>1 - Very poor</option>
+              </select>
+            </div>
+            <div className="feedback-textarea">
+              <label htmlFor="feedback">Comments (optional)</label>
+              <textarea
+                id="feedback"
+                rows="4"
+                placeholder="Share what you liked or what could be improved..."
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="feedback-submit-button">
+              Submit Feedback
+            </button>
+          </form>
+          {feedbackStatus && (
+            <p className="feedback-status">{feedbackStatus}</p>
+          )}
+        </div>
       </div>
     </div>
   )

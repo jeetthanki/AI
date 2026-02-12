@@ -288,6 +288,77 @@
   border: 2px dashed rgba(255, 255, 255, 0.3);
 }
 
+.feedback-card {
+  margin-top: 20px;
+  background: linear-gradient(135deg, #f5f7ff 0%, #ffffff 100%);
+}
+
+.feedback-intro {
+  margin-bottom: 15px;
+  color: #555;
+}
+
+.feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.feedback-rating {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.feedback-rating select {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #d0d4ff;
+  font-size: 0.95rem;
+}
+
+.feedback-textarea textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d0d4ff;
+  font-size: 0.95rem;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.feedback-textarea label,
+.feedback-rating label {
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 4px;
+  display: inline-block;
+}
+
+.feedback-submit-button {
+  align-self: flex-start;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.feedback-submit-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(102, 126, 234, 0.3);
+}
+
+.feedback-status {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: #333;
+}
+
 @media (max-width: 768px) {
   .results-grid {
     grid-template-columns: 1fr;

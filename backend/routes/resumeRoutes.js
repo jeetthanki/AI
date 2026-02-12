@@ -4,10 +4,9 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import fs from 'fs/promises'
 import Resume from '../models/Resume.js'
-import AnalysisLog from '../models/AnalysisLog.js'
-import SkillSnapshot from '../models/SkillSnapshot.js'
-import RecommendationSet from '../models/RecommendationSet.js'
-import UserActivity from '../models/UserActivity.js'
+import AnalysisResult from '../models/AnalysisResult.js'
+import SkillExtracted from '../models/SkillExtracted.js'
+import ResumeParsedData from '../models/ResumeParsedData.js'
 import { extractTextFromResume } from '../services/resumeParser.js'
 import { analyzeResume } from '../services/aiAnalyzer.js'
 import { authenticate } from '../middleware/auth.js'
@@ -111,7 +110,7 @@ router.post('/analyze', authenticate, upload.single('resume'), async (req, res) 
     
     console.log(`[${new Date().toISOString()}] AI analysis completed in ${Date.now() - startTime}ms`)
 
-    // Save to database (main resume document)
+    // Save to database (main resume document – now focused on file metadata)
     resume = new Resume({
       user: req.user._id,
       filename: req.file.filename,
@@ -119,44 +118,48 @@ router.post('/analyze', authenticate, upload.single('resume'), async (req, res) 
       filePath: req.file.path,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
+      // keep legacy embedded analysis for backward compatibility
       analysis: analysis
     })
 
     await resume.save()
 
-    // Additional data tables (collections) - save in parallel for speed
-    const [analysisLog, skillSnapshot, recommendationSet, userActivity] = await Promise.all([
-      AnalysisLog.create({
-        user: req.user._id,
+    // New normalized data tables (collections)
+    const analysisResult = await AnalysisResult.create({
+      resume: resume._id,
+      ats_score: analysis.atsScore,
+      grammar_score: null, // not currently provided by AI
+      keyword_match_score: analysis.keywordScore,
+      overall_score: analysis.overallScore,
+      strengths: JSON.stringify(analysis.strengths || []),
+      weaknesses: JSON.stringify(analysis.improvements || []),
+      suggestions: JSON.stringify(analysis.recommendations || [])
+    })
+
+    // Store extracted skills as separate documents
+    const skills = analysis.skills || []
+    if (skills.length > 0) {
+      const skillDocs = skills.map(skill => ({
         resume: resume._id,
-        provider: 'gemini',
-        model: 'gemini-2.5-flash',
-        success: true
-      }),
-      SkillSnapshot.create({
-        user: req.user._id,
-        resume: resume._id,
-        skills: analysis.skills || [],
-        primarySkills: (analysis.skills || []).slice(0, 5),
-        totalSkills: (analysis.skills || []).length
-      }),
-      RecommendationSet.create({
-        user: req.user._id,
-        resume: resume._id,
-        strengths: analysis.strengths || [],
-        improvements: analysis.improvements || [],
-        recommendations: analysis.recommendations || [],
-        atsRecommendations: analysis.atsRecommendations || [],
-        missingKeywords: analysis.missingKeywords || []
-      }),
-      UserActivity.create({
-        user: req.user._id,
-        resume: resume._id,
-        overallScore: analysis.overallScore,
-        atsScore: analysis.atsScore,
-        keywordScore: analysis.keywordScore
-      })
-    ])
+        skill_name: skill,
+        skills_path: null,
+        category: null
+      }))
+      await SkillExtracted.insertMany(skillDocs)
+    }
+
+    // Placeholder parsed data record – can be enriched later when you add a parser
+    await ResumeParsedData.create({
+      resume: resume._id,
+      full_name: null,
+      email: null,
+      phone: null,
+      location: null,
+      education_data: null,
+      experience_data: null,
+      project_data: null,
+      parsing_status: 'FAILED'
+    })
 
     const totalTime = Date.now() - startTime
     console.log(`[${new Date().toISOString()}] Analysis complete in ${totalTime}ms`)
@@ -166,31 +169,12 @@ router.post('/analyze', authenticate, upload.single('resume'), async (req, res) 
       ...resume.analysis,
       resumeId: resume._id,
       meta: {
-        analysisLogId: analysisLog._id,
-        skillSnapshotId: skillSnapshot._id,
-        recommendationSetId: recommendationSet._id,
-        userActivityId: userActivity._id,
+        analysisResultId: analysisResult._id,
         processingTime: totalTime
       }
     })
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error processing resume:`, error.message)
-    
-    // Log error to AnalysisLog if resume was created
-    if (resume && resume._id) {
-      try {
-        await AnalysisLog.create({
-          user: req.user._id,
-          resume: resume._id,
-          provider: 'gemini',
-          model: 'gemini-2.5-flash',
-          success: false,
-          errorMessage: error.message
-        })
-      } catch (logError) {
-        console.error('Failed to log error:', logError)
-      }
-    }
     
     // Clean up file on error
     if (req.file && req.file.path) {

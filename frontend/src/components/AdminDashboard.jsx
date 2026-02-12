@@ -9,6 +9,7 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedUser, setSelectedUser] = useState(null)
+  const [feedbacks, setFeedbacks] = useState([])
 
   useEffect(() => {
     fetchDashboardData()
@@ -16,15 +17,17 @@ function AdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, usersRes, resumesRes] = await Promise.all([
+      const [statsRes, usersRes, resumesRes, feedbackRes] = await Promise.all([
         axios.get('/api/admin/dashboard/stats'),
         axios.get('/api/admin/users?limit=50'),
-        axios.get('/api/admin/resumes?limit=20')
+        axios.get('/api/admin/resumes?limit=20'),
+        axios.get('/api/admin/feedback')
       ])
       
       setStats(statsRes.data.stats)
       setUsers(usersRes.data.users)
       setResumes(resumesRes.data.resumes)
+      setFeedbacks(feedbackRes.data.feedbacks || [])
       setLoading(false)
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -74,6 +77,12 @@ function AdminDashboard() {
             onClick={() => setActiveTab('resumes')}
           >
             Resumes
+          </button>
+          <button 
+            className={activeTab === 'feedback' ? 'active' : ''}
+            onClick={() => setActiveTab('feedback')}
+          >
+            Feedback
           </button>
         </div>
       </div>
@@ -255,6 +264,53 @@ function AdminDashboard() {
                     <td>{new Date(resume.uploadedAt).toLocaleDateString()}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'feedback' && (
+        <div className="dashboard-content">
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Rating</th>
+                  <th>Feedback</th>
+                  <th>Overall Score</th>
+                  <th>ATS Score</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {feedbacks.length > 0 ? (
+                  feedbacks.map((fb) => (
+                    <tr key={fb._id}>
+                      <td>
+                        {fb.user?.name || 'Unknown'}
+                        <br />
+                        <small>{fb.user?.email}</small>
+                      </td>
+                      <td>{fb.rating || '-'}</td>
+                      <td style={{ maxWidth: '300px', whiteSpace: 'pre-wrap' }}>
+                        {fb.feedback_text || '-'}
+                      </td>
+                      <td>{fb.analysis?.overall_score ?? 'N/A'}</td>
+                      <td>{fb.analysis?.ats_score ?? 'N/A'}</td>
+                      <td>
+                        {fb.created_at
+                          ? new Date(fb.created_at).toLocaleString()
+                          : '-'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6">No feedback submitted yet.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

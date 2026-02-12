@@ -8,6 +8,8 @@ import { dirname, join } from 'path'
 import resumeRoutes from './routes/resumeRoutes.js'
 import authRoutes from './routes/authRoutes.js'
 import adminRoutes from './routes/adminRoutes.js'
+import feedbackRoutes from './routes/feedbackRoutes.js'
+import adminLogRoutes from './routes/adminLogRoutes.js'
 
 dotenv.config()
 
@@ -26,6 +28,8 @@ app.use(express.urlencoded({ extended: true }))
 app.use('/api/auth', authRoutes)
 app.use('/api/resume', resumeRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/feedback', feedbackRoutes)
+app.use('/api/admin-logs', adminLogRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

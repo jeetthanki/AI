@@ -1,35 +1,38 @@
 # Database Collections Reference
 
 ## Overview
-This application uses **6 MongoDB collections** to store resume analysis data.
+This application uses **7 MongoDB collections** to store resume analysis data, aligned with the new table design.
 
 ## Collections List
 
-### 1. **users** (User accounts)
+### 1. **users** (user_tbl equivalent)
 - Stores user registration and authentication data
 - Fields: `name`, `email`, `password`, `role`, `createdAt`
 
-### 2. **resumes** (Resume documents)
-- Stores uploaded resume files and analysis results
-- Fields: `user`, `filename`, `originalName`, `filePath`, `fileSize`, `mimeType`, `analysis`, `uploadedAt`
-- The `analysis` field contains all scores and feedback
+### 2. **resumes** (resume_tbl equivalent)
+- Stores uploaded resume files and analysis metadata
+- Fields: `user`, `filename`, `originalName`, `filePath`, `fileSize`, `mimeType`, `analysis` (legacy), `uploadedAt`
+- New normalized scores are stored in `analysisresults` instead of this embedded `analysis` field.
 
-### 3. **analysislogs** (AI analysis logs)
-- Logs every AI analysis request
-- Fields: `user`, `resume`, `provider` (gemini), `model` (gemini-2.5-flash), `success`, `errorMessage`, `createdAt`
-- Tracks which analyses succeeded/failed
+### 3. **analysisresults** (analysis_results_tbl)
+- Stores per-resume analysis scores and summary text
+- Fields: `resume`, `ats_score`, `grammar_score`, `keyword_match_score`, `overall_score`, `strengths`, `weaknesses`, `suggestions`, `analyzed_at`
 
-### 4. **skillsnapshots** (Skills extracted from resumes)
+### 4. **skillextracteds** (skill_extracted_tbl)
 - Stores skills identified in each resume
-- Fields: `user`, `resume`, `skills` (array), `primarySkills` (top 5), `totalSkills` (count), `createdAt`
+- Fields: `resume`, `skill_name`, `skills_path`, `category`
 
-### 5. **recommendationsets** (Recommendations and feedback)
-- Stores all recommendations and feedback for each resume
-- Fields: `user`, `resume`, `strengths`, `improvements`, `recommendations`, `atsRecommendations`, `missingKeywords`, `createdAt`
+### 5. **feedbacks** (feedback_tbl)
+- Stores feedback users give about analyses
+- Fields: `user`, `analysis`, `feedback_text`, `rating`, `created_at`
 
-### 6. **useractivities** (User activity scores)
-- Tracks scores for analytics and trends
-- Fields: `user`, `resume`, `overallScore`, `atsScore`, `keywordScore`, `createdAt`
+### 6. **adminlogs** (admin_logs_tbl)
+- Stores admin actions for auditing
+- Fields: `action`, `log_time`
+
+### 7. **resumeparseddatas** (resume_Parsed_Data_tbl)
+- Stores structured parsing output for resumes
+- Fields: `resume`, `full_name`, `email`, `phone`, `location`, `education_data`, `experience_data`, `project_data`, `parsing_status`
 
 ## How Collections Are Created
 
@@ -51,10 +54,11 @@ This application uses **6 MongoDB collections** to store resume analysis data.
 MongoDB automatically pluralizes model names:
 - `User` model → `users` collection
 - `Resume` model → `resumes` collection
-- `AnalysisLog` model → `analysislogs` collection
-- `SkillSnapshot` model → `skillsnapshots` collection
-- `RecommendationSet` model → `recommendationsets` collection
-- `UserActivity` model → `useractivities` collection
+- `AnalysisResult` model → `analysisresults` collection
+- `SkillExtracted` model → `skillextracteds` collection
+- `Feedback` model → `feedbacks` collection
+- `AdminLog` model → `adminlogs` collection
+- `ResumeParsedData` model → `resumeparseddatas` collection
 
 ## Checking Collections
 

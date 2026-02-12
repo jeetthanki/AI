@@ -3,6 +3,8 @@ import { authenticate } from '../middleware/auth.js'
 import { isAdmin } from '../middleware/auth.js'
 import User from '../models/User.js'
 import Resume from '../models/Resume.js'
+import AnalysisResult from '../models/AnalysisResult.js'
+import Feedback from '../models/Feedback.js'
 import mongoose from 'mongoose'
 
 const router = express.Router()
@@ -31,14 +33,14 @@ router.get('/dashboard/stats', async (req, res) => {
       uploadedAt: { $gte: sevenDaysAgo }
     })
     
-    // Average scores
-    const avgScores = await Resume.aggregate([
+    // Average scores (now from AnalysisResult collection)
+    const avgScores = await AnalysisResult.aggregate([
       {
         $group: {
           _id: null,
-          avgOverallScore: { $avg: '$analysis.overallScore' },
-          avgAtsScore: { $avg: '$analysis.atsScore' },
-          avgKeywordScore: { $avg: '$analysis.keywordScore' }
+          avgOverallScore: { $avg: '$overall_score' },
+          avgAtsScore: { $avg: '$ats_score' },
+          avgKeywordScore: { $avg: '$keyword_match_score' }
         }
       }
     ])
@@ -100,11 +102,11 @@ router.get('/dashboard/stats', async (req, res) => {
       }
     ])
     
-    // Score distribution
-    const scoreDistribution = await Resume.aggregate([
+    // Score distribution (bucket by overall_score from AnalysisResult)
+    const scoreDistribution = await AnalysisResult.aggregate([
       {
         $bucket: {
-          groupBy: '$analysis.overallScore',
+          groupBy: '$overall_score',
           boundaries: [0, 40, 60, 80, 100],
           default: 'Other',
           output: {
@@ -244,6 +246,24 @@ router.get('/users/:userId/activity', async (req, res) => {
   } catch (error) {
     console.error('Error fetching user activity:', error)
     res.status(500).json({ error: 'Failed to fetch user activity' })
+  }
+})
+
+// Get all user feedback for admin review
+router.get('/feedback', async (req, res) => {
+  try {
+    const feedbacks = await Feedback.find()
+      .populate('user', 'name email')
+      .populate('analysis', 'overall_score ats_score keyword_match_score analyzed_at')
+      .sort({ created_at: -1 })
+
+    res.json({
+      success: true,
+      feedbacks
+    })
+  } catch (error) {
+    console.error('Error fetching feedback:', error)
+    res.status(500).json({ error: 'Failed to fetch feedback' })
   }
 })
 

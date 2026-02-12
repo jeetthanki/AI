@@ -1,11 +1,12 @@
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
-import AnalysisLog from './models/AnalysisLog.js'
-import SkillSnapshot from './models/SkillSnapshot.js'
-import RecommendationSet from './models/RecommendationSet.js'
-import UserActivity from './models/UserActivity.js'
 import Resume from './models/Resume.js'
 import User from './models/User.js'
+import AnalysisResult from './models/AnalysisResult.js'
+import SkillExtracted from './models/SkillExtracted.js'
+import Feedback from './models/Feedback.js'
+import AdminLog from './models/AdminLog.js'
+import ResumeParsedData from './models/ResumeParsedData.js'
 
 dotenv.config()
 
@@ -36,10 +37,11 @@ async function checkCollections() {
     const expectedCollections = [
       { name: 'users', model: User, description: 'User accounts' },
       { name: 'resumes', model: Resume, description: 'Resume documents' },
-      { name: 'analysislogs', model: AnalysisLog, description: 'AI analysis logs' },
-      { name: 'skillsnapshots', model: SkillSnapshot, description: 'Skills extracted from resumes' },
-      { name: 'recommendationsets', model: RecommendationSet, description: 'Recommendations and feedback' },
-      { name: 'useractivities', model: UserActivity, description: 'User activity scores' }
+      { name: 'analysisresults', model: AnalysisResult, description: 'Per-resume analysis scores' },
+      { name: 'skillextracteds', model: SkillExtracted, description: 'Skills extracted from resumes' },
+      { name: 'feedbacks', model: Feedback, description: 'User feedback on analyses' },
+      { name: 'adminlogs', model: AdminLog, description: 'Admin audit log' },
+      { name: 'resumeparseddatas', model: ResumeParsedData, description: 'Structured parsed resume data' }
     ]
     
     console.log('📋 Collection Status:\n')
