@@ -6,13 +6,17 @@ import Register from './components/Register'
 import ResumeUpload from './components/ResumeUpload'
 import AnalysisResults from './components/AnalysisResults'
 import AdminDashboard from './components/AdminDashboard'
+import ForgotPassword from './components/ForgotPassword'
+import { useToast } from './context/ToastContext'
+import ProfilePanel from './components/ProfilePanel'
 
 function App() {
   const { user, loading, logout } = useContext(AuthContext)
-  const [showRegister, setShowRegister] = useState(false)
+  const [authView, setAuthView] = useState('login') // 'login' | 'register' | 'forgot'
   const [analysisResult, setAnalysisResult] = useState(null)
   const [uploadLoading, setUploadLoading] = useState(false)
   const [error, setError] = useState(null)
+  const { showToast } = useToast()
 
   const handleAnalysisComplete = (result) => {
     setAnalysisResult(result)
@@ -28,6 +32,9 @@ function App() {
 
   const handleError = (err) => {
     setError(err)
+    if (err) {
+      showToast({ message: err, type: 'error' })
+    }
     setUploadLoading(false)
   }
 
@@ -47,10 +54,17 @@ function App() {
   if (!user) {
     return (
       <div className="App">
-        {showRegister ? (
-          <Register onSwitchToLogin={() => setShowRegister(false)} />
-        ) : (
-          <Login onSwitchToRegister={() => setShowRegister(true)} />
+        {authView === 'register' && (
+          <Register onSwitchToLogin={() => setAuthView('login')} />
+        )}
+        {authView === 'login' && (
+          <Login
+            onSwitchToRegister={() => setAuthView('register')}
+            onForgotPassword={() => setAuthView('forgot')}
+          />
+        )}
+        {authView === 'forgot' && (
+          <ForgotPassword onBackToLogin={() => setAuthView('login')} />
         )}
       </div>
     )
@@ -99,6 +113,8 @@ function App() {
             </div>
           </div>
         </header>
+
+        <ProfilePanel />
 
         {!analysisResult && !uploadLoading && (
           <div className="welcome-tips">

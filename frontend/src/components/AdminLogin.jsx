@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import './Auth.css'
 
 function AdminLogin() {
@@ -10,6 +11,7 @@ function AdminLogin() {
   const [loading, setLoading] = useState(false)
   const { login } = useContext(AuthContext)
   const navigate = useNavigate()
+  const { showToast } = useToast()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -21,15 +23,18 @@ function AdminLogin() {
     if (!result.success) {
       setError(result.error)
       setLoading(false)
+      showToast({ message: result.error || 'Login failed', type: 'error' })
       return
     }
 
     if (result.user?.role !== 'admin') {
       setError('Access denied: this account is not an admin.')
       setLoading(false)
+      showToast({ message: 'Access denied for non-admin account', type: 'error' })
       return
     }
 
+    showToast({ message: 'Signed in as admin', type: 'success' })
     navigate('/admin')
   }
 

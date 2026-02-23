@@ -1,5 +1,6 @@
 import { useState, useContext } from 'react'
 import { AuthContext } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import './Auth.css'
 
 function Register({ onSwitchToLogin }) {
@@ -10,6 +11,7 @@ function Register({ onSwitchToLogin }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { register } = useContext(AuthContext)
+  const { showToast } = useToast()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -31,7 +33,11 @@ function Register({ onSwitchToLogin }) {
     if (!result.success) {
       setError(result.error)
       setLoading(false)
+      showToast({ message: result.error || 'Registration failed', type: 'error' })
+      return
     }
+
+    showToast({ message: 'Account created. Welcome!', type: 'success' })
   }
 
   return (

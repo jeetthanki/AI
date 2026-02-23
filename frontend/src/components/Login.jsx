@@ -1,13 +1,15 @@
 import { useState, useContext } from 'react'
 import { AuthContext } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import './Auth.css'
 
-function Login({ onSwitchToRegister }) {
+function Login({ onSwitchToRegister, onForgotPassword }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useContext(AuthContext)
+  const { showToast } = useToast()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -19,7 +21,11 @@ function Login({ onSwitchToRegister }) {
     if (!result.success) {
       setError(result.error)
       setLoading(false)
+      showToast({ message: result.error || 'Login failed', type: 'error' })
+      return
     }
+
+    showToast({ message: 'Welcome back!', type: 'success' })
   }
 
   return (
@@ -55,18 +61,27 @@ function Login({ onSwitchToRegister }) {
               minLength={6}
             />
           </div>
-          
+
           <button type="submit" className="auth-button" disabled={loading}>
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
         
-        <p className="auth-switch">
-          Don't have an account?{' '}
-          <button onClick={onSwitchToRegister} className="link-button">
-            Register here
+        <div className="auth-footer-row">
+          <span>
+            Don't have an account?
+            <button onClick={onSwitchToRegister} className="link-button">
+              Register
+            </button>
+          </span>
+          <button
+            type="button"
+            className="auth-inline-link"
+            onClick={onForgotPassword}
+          >
+            Forgot password?
           </button>
-        </p>
+        </div>
       </div>
     </div>
   )

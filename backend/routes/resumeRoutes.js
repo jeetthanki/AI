@@ -7,7 +7,7 @@ import Resume from '../models/Resume.js'
 import AnalysisResult from '../models/AnalysisResult.js'
 import SkillExtracted from '../models/SkillExtracted.js'
 import ResumeParsedData from '../models/ResumeParsedData.js'
-import { extractTextFromResume } from '../services/resumeParser.js'
+import { extractTextFromResume, parseResumeData } from '../services/resumeParser.js'
 import { analyzeResume } from '../services/aiAnalyzer.js'
 import { authenticate } from '../middleware/auth.js'
 import { generatePDFReport } from '../services/reportGenerator.js'
@@ -148,18 +148,24 @@ router.post('/analyze', authenticate, upload.single('resume'), async (req, res) 
       await SkillExtracted.insertMany(skillDocs)
     }
 
-    // Placeholder parsed data record – can be enriched later when you add a parser
+    // Parse structured data from resume text
+    const parsedData = parseResumeData(resumeText)
     await ResumeParsedData.create({
       resume: resume._id,
-      full_name: null,
-      email: null,
-      phone: null,
-      location: null,
-      education_data: null,
-      experience_data: null,
-      project_data: null,
-      parsing_status: 'FAILED'
+      full_name: parsedData.full_name,
+      email: parsedData.email,
+      phone: parsedData.phone,
+      location: parsedData.location,
+      education_data: parsedData.education_data.length > 0 ? parsedData.education_data : null,
+      experience_data: parsedData.experience_data.length > 0 ? parsedData.experience_data : null,
+      project_data: parsedData.project_data.length > 0 ? parsedData.project_data : null,
+      parsing_status: parsedData.parsing_status
     })
+    
+    console.log(`[Resume Parser] Parsing status: ${parsedData.parsing_status}`)
+    if (parsedData.parsing_status === 'SUCCESS') {
+      console.log(`[Resume Parser] Extracted - Name: ${parsedData.full_name || 'N/A'}, Email: ${parsedData.email || 'N/A'}, Phone: ${parsedData.phone || 'N/A'}`)
+    }
 
     const totalTime = Date.now() - startTime
     console.log(`[${new Date().toISOString()}] Analysis complete in ${totalTime}ms`)

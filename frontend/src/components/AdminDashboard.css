@@ -1,57 +1,59 @@
 .admin-dashboard {
   min-height: 100vh;
-  padding: 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 16px 0 32px;
 }
 
 .dashboard-header {
-  background: white;
-  border-radius: 12px;
-  padding: 30px;
-  margin-bottom: 30px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 22px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  border: 1px solid #e5e7eb;
 }
 
 .dashboard-header h1 {
-  color: #333;
-  margin-bottom: 20px;
-  font-size: 2.5rem;
+  color: #111827;
+  margin-bottom: 16px;
+  font-size: 1.6rem;
 }
 
 .dashboard-tabs {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .dashboard-tabs button {
-  background: #f8f9fa;
-  border: 2px solid #e0e0e0;
-  padding: 12px 24px;
-  border-radius: 8px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  padding: 8px 14px;
+  border-radius: 999px;
   cursor: pointer;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #666;
-  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #4b5563;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    transform 0.1s ease;
 }
 
 .dashboard-tabs button:hover {
-  background: #e9ecef;
-  border-color: #667eea;
+  background-color: #e5e7eb;
+  border-color: #d1d5db;
 }
 
 .dashboard-tabs button.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-color: #667eea;
+  background-color: #111827;
+  color: #f9fafb;
+  border-color: #111827;
 }
 
 .dashboard-content {
-  background: white;
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+  border: 1px solid #e5e7eb;
 }
 
 .stats-grid {
@@ -62,51 +64,45 @@
 }
 
 .stat-card {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-radius: 12px;
-  padding: 25px;
+  background-color: #f9fafb;
+  border-radius: 14px;
+  padding: 18px 16px;
   display: flex;
   align-items: center;
-  gap: 20px;
-  border: 2px solid #e0e0e0;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  gap: 16px;
+  border: 1px solid #e5e7eb;
 }
 
 .stat-icon {
-  font-size: 3rem;
-  width: 80px;
-  height: 80px;
+  font-size: 2.2rem;
+  width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
+  background-color: #ffffff;
   border-radius: 50%;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
 }
 
 .stat-info h3 {
-  color: #666;
-  font-size: 0.9rem;
+  color: #6b7280;
+  font-size: 0.8rem;
   margin-bottom: 5px;
   font-weight: 500;
 }
 
 .stat-value {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #333;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #111827;
   margin: 5px 0;
 }
 
 .stat-change {
-  color: #4caf50;
-  font-size: 0.85rem;
-  font-weight: 600;
+  color: #10b981;
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
 .charts-section {
@@ -117,10 +113,10 @@
 }
 
 .chart-card {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 25px;
-  border: 1px solid #e0e0e0;
+  background-color: #f9fafb;
+  border-radius: 14px;
+  padding: 18px 16px;
+  border: 1px solid #e5e7eb;
 }
 
 .chart-card.full-width {
@@ -128,10 +124,9 @@
 }
 
 .chart-card h3 {
-  color: #333;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid #667eea;
+  color: #111827;
+  margin-bottom: 14px;
+  padding-bottom: 0;
 }
 
 .top-users-list {
@@ -143,17 +138,17 @@
 .top-user-item {
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 15px;
-  background: white;
-  border-radius: 8px;
-  border-left: 4px solid #667eea;
+  gap: 12px;
+  padding: 12px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
 }
 
 .user-rank {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #667eea;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
   min-width: 40px;
 }
 
@@ -162,19 +157,20 @@
 }
 
 .user-name {
-  font-weight: 600;
-  color: #333;
+  font-weight: 500;
+  color: #111827;
   margin-bottom: 5px;
 }
 
 .user-email {
-  color: #666;
-  font-size: 0.9rem;
+  color: #6b7280;
+  font-size: 0.8rem;
 }
 
 .user-count {
-  color: #667eea;
-  font-weight: 600;
+  color: #111827;
+  font-weight: 500;
+  font-size: 0.85rem;
 }
 
 .score-distribution {
@@ -191,21 +187,21 @@
 
 .distribution-label {
   min-width: 80px;
-  font-weight: 600;
-  color: #333;
+  font-weight: 500;
+  color: #111827;
 }
 
 .distribution-bar-container {
   flex: 1;
   height: 30px;
-  background: #e0e0e0;
+  background: #e5e7eb;
   border-radius: 15px;
   overflow: hidden;
 }
 
 .distribution-bar {
   height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-color: #111827;
   border-radius: 15px;
   transition: width 0.3s ease;
 }
@@ -213,8 +209,9 @@
 .distribution-count {
   min-width: 40px;
   text-align: right;
-  font-weight: 600;
-  color: #666;
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 0.85rem;
 }
 
 .activity-chart {
@@ -237,21 +234,21 @@
 
 .activity-bar-fill {
   width: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-color: #111827;
   border-radius: 4px 4px 0 0;
   min-height: 10px;
   transition: height 0.3s ease;
 }
 
 .activity-count {
-  font-weight: 600;
-  color: #333;
-  font-size: 0.9rem;
+  font-weight: 500;
+  color: #111827;
+  font-size: 0.8rem;
 }
 
 .activity-date {
-  font-size: 0.75rem;
-  color: #666;
+  font-size: 0.7rem;
+  color: #6b7280;
   writing-mode: vertical-rl;
   text-orientation: mixed;
 }
@@ -267,46 +264,49 @@
 }
 
 .data-table thead {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background-color: #f9fafb;
+  color: #111827;
 }
 
 .data-table th {
-  padding: 15px;
+  padding: 12px;
   text-align: left;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.8rem;
 }
 
 .data-table td {
-  padding: 15px;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.85rem;
 }
 
 .data-table tbody tr:hover {
-  background: #f8f9fa;
+  background: #f9fafb;
 }
 
 .data-table small {
-  color: #666;
-  font-size: 0.85rem;
+  color: #6b7280;
+  font-size: 0.75rem;
 }
 
 .view-button,
 .back-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background-color: #111827;
+  color: #f9fafb;
   border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
   cursor: pointer;
-  font-weight: 600;
-  transition: all 0.3s ease;
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 .view-button:hover,
 .back-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
 }
 
 .back-button {
@@ -316,16 +316,16 @@
 .user-activity-header {
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .user-activity-header h2 {
-  color: #333;
+  color: #111827;
   margin-bottom: 10px;
 }
 
 .user-activity-header p {
-  color: #666;
+  color: #6b7280;
   margin: 5px 0;
 }
 
@@ -336,15 +336,16 @@
 }
 
 .activity-resume-card {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 20px;
-  border: 1px solid #e0e0e0;
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 16px 14px;
+  border: 1px solid #e5e7eb;
 }
 
 .activity-resume-card h4 {
-  color: #333;
-  margin-bottom: 15px;
+  color: #111827;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
 }
 
 .resume-scores {
@@ -354,16 +355,17 @@
 }
 
 .resume-scores span {
-  background: white;
-  padding: 8px 12px;
+  background: #ffffff;
+  padding: 6px 10px;
   border-radius: 6px;
-  font-weight: 600;
-  color: #667eea;
+  font-weight: 500;
+  color: #111827;
+  font-size: 0.8rem;
 }
 
 .resume-date {
-  color: #666;
-  font-size: 0.9rem;
+  color: #6b7280;
+  font-size: 0.8rem;
 }
 
 .loading-container {
@@ -372,12 +374,12 @@
   align-items: center;
   justify-content: center;
   min-height: 400px;
-  color: white;
+  color: #111827;
 }
 
 .spinner {
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top: 4px solid white;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #111827;
   border-radius: 50%;
   width: 50px;
   height: 50px;

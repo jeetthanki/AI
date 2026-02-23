@@ -2,6 +2,190 @@ import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 import fs from 'fs/promises'
 
+/**
+ * Parse structured data from resume text
+ * Extracts: name, email, phone, location, education, experience, projects
+ */
+export function parseResumeData(resumeText) {
+  const parsed = {
+    full_name: null,
+    email: null,
+    phone: null,
+    location: null,
+    education_data: [],
+    experience_data: [],
+    project_data: []
+  }
+
+  try {
+    const lines = resumeText.split('\n').map(line => line.trim()).filter(line => line.length > 0)
+    const text = resumeText.toLowerCase()
+
+    // Extract email (common pattern)
+    const emailMatch = resumeText.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/)
+    if (emailMatch) {
+      parsed.email = emailMatch[0]
+    }
+
+    // Extract phone (various formats)
+    const phonePatterns = [
+      /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/,
+      /\b\(\d{3}\)\s?\d{3}[-.\s]?\d{4}\b/,
+      /\b\+\d{1,3}[-.\s]?\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/,
+      /\b\d{10}\b/
+    ]
+    for (const pattern of phonePatterns) {
+      const match = resumeText.match(pattern)
+      if (match) {
+        parsed.phone = match[0].replace(/\s+/g, '').substring(0, 20)
+        break
+      }
+    }
+
+    // Extract location (look for common location keywords)
+    const locationKeywords = ['city', 'state', 'country', 'address', 'location', 'based in', 'residing in']
+    const locationPattern = new RegExp(`(${locationKeywords.join('|')}):?\\s*([^\\n]+)`, 'i')
+    const locationMatch = resumeText.match(locationPattern)
+    if (locationMatch && locationMatch[2]) {
+      parsed.location = locationMatch[2].trim().substring(0, 100)
+    } else {
+      // Try to find common location patterns at the top
+      const topLines = lines.slice(0, 5).join(' ')
+      const cityStateMatch = topLines.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2}|[A-Z][a-z]+)\b/)
+      if (cityStateMatch) {
+        parsed.location = cityStateMatch[0].substring(0, 100)
+      }
+    }
+
+    // Extract full name (usually first line or before email)
+    if (lines.length > 0) {
+      const firstLine = lines[0]
+      // Name is usually before email/phone, and contains 2-4 capitalized words
+      if (!firstLine.includes('@') && !firstLine.match(/\d{3}/)) {
+        const nameWords = firstLine.split(/\s+/).filter(w => w.length > 1)
+        if (nameWords.length >= 2 && nameWords.length <= 4) {
+          // Check if it looks like a name (starts with capital, no special chars except hyphens)
+          if (nameWords.every(w => /^[A-Z][a-z-]+$/.test(w))) {
+            parsed.full_name = firstLine.substring(0, 100)
+          }
+        }
+      }
+    }
+
+    // Extract education data
+    const educationKeywords = ['education', 'academic', 'qualification', 'degree', 'university', 'college', 'school']
+    let educationStartIndex = -1
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase()
+      if (educationKeywords.some(keyword => line.includes(keyword))) {
+        educationStartIndex = i
+        break
+      }
+    }
+
+    if (educationStartIndex !== -1) {
+      const educationLines = []
+      for (let i = educationStartIndex + 1; i < Math.min(educationStartIndex + 20, lines.length); i++) {
+        const line = lines[i]
+        // Stop at next major section
+        if (line.match(/^(experience|work|projects|skills|summary|objective)/i)) {
+          break
+        }
+        if (line.length > 5 && !line.match(/^[-•\s]+$/)) {
+          educationLines.push(line)
+        }
+      }
+      
+      if (educationLines.length > 0) {
+        parsed.education_data = educationLines.slice(0, 10).map(line => ({
+          institution: line.substring(0, 200),
+          details: line
+        }))
+      }
+    }
+
+    // Extract experience data
+    const experienceKeywords = ['experience', 'work', 'employment', 'career', 'professional']
+    let experienceStartIndex = -1
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase()
+      if (experienceKeywords.some(keyword => line.includes(keyword))) {
+        experienceStartIndex = i
+        break
+      }
+    }
+
+    if (experienceStartIndex !== -1) {
+      const experienceLines = []
+      for (let i = experienceStartIndex + 1; i < Math.min(experienceStartIndex + 30, lines.length); i++) {
+        const line = lines[i]
+        // Stop at next major section
+        if (line.match(/^(education|projects|skills|summary|objective|references)/i)) {
+          break
+        }
+        if (line.length > 5 && !line.match(/^[-•\s]+$/)) {
+          experienceLines.push(line)
+        }
+      }
+      
+      if (experienceLines.length > 0) {
+        parsed.experience_data = experienceLines.slice(0, 15).map(line => ({
+          position: line.substring(0, 200),
+          details: line
+        }))
+      }
+    }
+
+    // Extract project data
+    const projectKeywords = ['projects', 'project', 'portfolio', 'work samples']
+    let projectStartIndex = -1
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase()
+      if (projectKeywords.some(keyword => line.includes(keyword))) {
+        projectStartIndex = i
+        break
+      }
+    }
+
+    if (projectStartIndex !== -1) {
+      const projectLines = []
+      for (let i = projectStartIndex + 1; i < Math.min(projectStartIndex + 20, lines.length); i++) {
+        const line = lines[i]
+        // Stop at next major section
+        if (line.match(/^(education|experience|skills|summary|objective|references)/i)) {
+          break
+        }
+        if (line.length > 5 && !line.match(/^[-•\s]+$/)) {
+          projectLines.push(line)
+        }
+      }
+      
+      if (projectLines.length > 0) {
+        parsed.project_data = projectLines.slice(0, 10).map(line => ({
+          name: line.substring(0, 200),
+          details: line
+        }))
+      }
+    }
+
+    // Determine parsing status
+    const hasData = parsed.full_name || parsed.email || parsed.phone || 
+                    parsed.education_data.length > 0 || parsed.experience_data.length > 0 || 
+                    parsed.project_data.length > 0
+
+    return {
+      ...parsed,
+      parsing_status: hasData ? 'SUCCESS' : 'FAILED'
+    }
+  } catch (error) {
+    console.error('[Resume Parser] Error parsing resume data:', error)
+    return {
+      ...parsed,
+      parsing_status: 'FAILED'
+    }
+  }
+}
+
 export async function extractTextFromResume(filePath, mimeType) {
   try {
     // Verify file exists

@@ -4,16 +4,19 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import App from './App.jsx'
 import AdminPage from './components/AdminPage.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
+import { ToastProvider } from './context/ToastContext.jsx'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/*" element={<App />} />
-        </Routes>
+        <ToastProvider>
+          <Routes>
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/*" element={<App />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
