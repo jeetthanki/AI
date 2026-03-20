@@ -83,8 +83,8 @@ function App() {
               </div>
               <div className="user-section">
                 <span className="user-name">Welcome, {user.name}!</span>
-                <button onClick={logout} className="logout-button">
-                  Logout
+                <button onClick={logout} className="button button-secondary">
+                  Sign out
                 </button>
               </div>
             </div>
@@ -99,50 +99,67 @@ function App() {
   return (
     <div className="App">
       <div className="container">
-        <header className="header">
+        <header className="header header-pro">
           <div className="header-content">
-            <div>
-              <h1>✨ AI Resume Analyzer</h1>
-              <p>Get instant, personalized feedback on your resume</p>
+            <div className="brand-block">
+              <div className="brand-title-row">
+                <h1 className="brand-title">AI Resume Analyzer</h1>
+                <span className="brand-badge">Beta</span>
+              </div>
+              <p className="brand-subtitle">
+                Upload your resume and get clear, actionable feedback in seconds.
+              </p>
             </div>
             <div className="user-section">
-              <span className="user-name">Welcome, {user.name}!</span>
-              <button onClick={logout} className="logout-button">
-                Logout
+              <span className="user-name">{user.name}</span>
+              <button onClick={logout} className="button button-secondary">
+                Sign out
               </button>
             </div>
           </div>
         </header>
 
-        <ProfilePanel />
+        <main className="main-grid">
+          <section className="panel">
+            <div className="panel-header">
+              <h2 className="panel-title">Analyze your resume</h2>
+              <p className="panel-subtitle">PDF or Word. Best results with selectable text.</p>
+            </div>
 
-        {!analysisResult && !uploadLoading && (
-          <div className="welcome-tips">
-            <h3>💡 Quick Tips</h3>
-            <ul>
-              <li>Upload a text-based PDF or Word document for best results</li>
-              <li>Ensure your resume contains selectable text (not scanned images)</li>
-              <li>Get detailed scores and personalized recommendations</li>
-            </ul>
-          </div>
-        )}
+            <ResumeUpload
+              onUploadStart={handleUploadStart}
+              onAnalysisComplete={handleAnalysisComplete}
+              onError={handleError}
+              loading={uploadLoading}
+            />
 
-        <ResumeUpload
-          onUploadStart={handleUploadStart}
-          onAnalysisComplete={handleAnalysisComplete}
-          onError={handleError}
-          loading={uploadLoading}
-        />
+            {error && (
+              <div className="error-message">
+                <p>{error}</p>
+              </div>
+            )}
 
-        {error && (
-          <div className="error-message">
-            <p>⚠️ {error}</p>
-          </div>
-        )}
+            {analysisResult && <AnalysisResults result={analysisResult} />}
+          </section>
 
-        {analysisResult && (
-          <AnalysisResults result={analysisResult} />
-        )}
+          <aside className="side-column">
+            <ProfilePanel />
+
+            {!analysisResult && !uploadLoading && (
+              <div className="panel panel-muted">
+                <div className="panel-header">
+                  <h3 className="panel-title">Quick tips</h3>
+                  <p className="panel-subtitle">Small changes that usually boost scores fast.</p>
+                </div>
+                <ul className="tips-list">
+                  <li>Use clear section headings (Experience, Skills, Education).</li>
+                  <li>Avoid images for key text. ATS prefers selectable text.</li>
+                  <li>Tailor keywords to the role you’re applying for.</li>
+                </ul>
+              </div>
+            )}
+          </aside>
+        </main>
       </div>
     </div>
   )

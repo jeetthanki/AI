@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import axios from 'axios'
 import './AnalysisResults.css'
+import { useToast } from '../context/ToastContext'
 
 function getScoreColor(score) {
   if (!score && score !== 0) return ''
@@ -15,10 +16,11 @@ function AnalysisResults({ result }) {
   const [feedbackText, setFeedbackText] = useState('')
   const [rating, setRating] = useState(0)
   const [feedbackStatus, setFeedbackStatus] = useState(null)
+  const { showToast } = useToast()
 
   const handleDownload = async () => {
     if (!result.resumeId) {
-      alert('Resume ID not available')
+      showToast({ message: 'Resume ID not available', type: 'error' })
       return
     }
 
@@ -38,7 +40,7 @@ function AnalysisResults({ result }) {
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Error downloading report:', error)
-      alert('Failed to download report. Please try again.')
+      showToast({ message: 'Failed to download report. Please try again.', type: 'error' })
     } finally {
       setDownloading(false)
     }

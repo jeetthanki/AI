@@ -33,8 +33,8 @@ function AdminPage() {
             </div>
             <div className="user-section">
               <span className="user-name">Welcome, {user.name}!</span>
-              <button onClick={logout} className="logout-button">
-                Logout
+              <button onClick={logout} className="button button-secondary">
+                Sign out
               </button>
             </div>
           </div>

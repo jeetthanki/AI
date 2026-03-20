@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useToast } from '../context/ToastContext'
 import './Auth.css'
@@ -7,10 +7,12 @@ import './Auth.css'
 function ResetPassword() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
+  const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
+  const [done, setDone] = useState(false)
   const { showToast } = useToast()
 
   const handleSubmit = async (e) => {
@@ -41,11 +43,13 @@ function ResetPassword() {
       const msg = response.data?.message || 'Password reset successfully.'
       setMessage(msg)
       showToast({ message: msg, type: 'success' })
+      setDone(true)
     } catch (error) {
       const msg =
         error.response?.data?.error || 'Failed to reset password. Try again.'
       setMessage(msg)
       showToast({ message: msg, type: 'error' })
+      setDone(false)
     } finally {
       setSubmitting(false)
     }
@@ -72,6 +76,7 @@ function ResetPassword() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="At least 6 characters"
+              disabled={done}
             />
           </div>
           <div className="form-group">
@@ -84,12 +89,19 @@ function ResetPassword() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Repeat your new password"
+              disabled={done}
             />
           </div>
 
-          <button type="submit" className="auth-button" disabled={submitting}>
-            {submitting ? 'Updating...' : 'Update password'}
-          </button>
+          {!done ? (
+            <button type="submit" className="auth-button" disabled={submitting}>
+              {submitting ? 'Updating...' : 'Update password'}
+            </button>
+          ) : (
+            <button type="button" className="auth-button" onClick={() => navigate('/')}>
+              Go to login
+            </button>
+          )}
         </form>
       </div>
     </div>
