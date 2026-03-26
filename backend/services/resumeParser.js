@@ -2,10 +2,6 @@ import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 import fs from 'fs/promises'
 
-/**
- * Parse structured data from resume text
- * Extracts: name, email, phone, location, education, experience, projects
- */
 export function parseResumeData(resumeText) {
   const parsed = {
     full_name: null,
