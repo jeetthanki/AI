@@ -3,12 +3,13 @@ import axios from 'axios'
 
 export const AuthContext = createContext()
 
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || ''
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [token, setToken] = useState(localStorage.getItem('token'))
 
-  // Set default axios header
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
@@ -42,9 +43,10 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true, user }
     } catch (error) {
+      const errMsg = error.response?.data?.error
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Login failed' 
+        error: typeof errMsg === 'string' ? errMsg : error.response?.data?.message || 'Login failed'
       }
     }
   }
@@ -61,9 +63,10 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true }
     } catch (error) {
+      const errMsg = error.response?.data?.error
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Registration failed' 
+        error: typeof errMsg === 'string' ? errMsg : error.response?.data?.message || 'Registration failed'
       }
     }
   }
@@ -81,4 +84,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   )
 }
-
